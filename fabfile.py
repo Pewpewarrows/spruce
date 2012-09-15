@@ -9,7 +9,7 @@ def prepare_ppa():
 	sudo("apt-get update -y")
 	sudo('adduser --no-create-home --disabled-login --system salt')
 
-def bootstrap():
+def bootstrap_minion():
 	"""
 	Bootstrap a host with a salt minion
 	"""
