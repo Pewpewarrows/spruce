@@ -1,0 +1,17 @@
+In-file comments, in order of importance
+========================================
+
+# FIXME:
+# TODO:
+# HACK:
+# XXX:
+
+
+General
+=======
+
+
+
+Notes
+=====
+

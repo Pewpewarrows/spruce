@@ -1,0 +1,11 @@
+#!/usr/bin/env sh
+
+curdir=${0%/*}
+
+function Main__main {
+    # TODO: Add --distribute --never-download --extra-search-dir=${curdir}/../vendor/python/
+    python script/virtualenv_bootstrap.py ENV/
+    echo "\nRun \`source ./ENV/bin/activate\` to complete setup"
+}
+
+Main__main "$@"
