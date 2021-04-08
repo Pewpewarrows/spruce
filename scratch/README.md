@@ -1,0 +1,5 @@
+# Spruce
+
+```
+$ vagrant up
+```

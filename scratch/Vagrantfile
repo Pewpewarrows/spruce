@@ -1,0 +1,120 @@
+# -*- mode: ruby -*-
+# vi: set ft=ruby :
+
+require 'yaml'
+
+# Older versions have less info in ansible inventory they generate
+Vagrant.require_version '>= 1.8.0'
+VAGRANTFILE_API_VERSION = '2'
+
+# TODO: detect if ansible is a usable host command, otherwise bootstrap into using ansible_local
+
+# detect if provision has already run:
+# if File.exist?('.vagrant/machines/YOUR_BOX_ID/virtualbox/action_provision')
+
+# crowdsourced search help:
+# GitHub: filename:Vagrantfile <searchterm>
+# Google: <searchterm> Vagrantfile site:gist.github.com
+
+# pre-user global overrides, typically only for performance reasons
+settings = File.exists?('vagrant.yml') ? YAML.load_file 'vagrant.yml' : {}
+
+memory = settings['memory']) ||= 1024
+cpus = settings['cpus']) ||= 2
+cpu_cap = settings['cpu_cap']) ||= 50
+
+hosts = YAML.load_file 'vagrant_hosts.yml'
+
+# Set options for the network interface configuration. All values are optional, and can include:
+# - ip (default = DHCP)
+# - netmask (default value = 255.255.255.0)
+# - mac
+# - auto_config (if false, Vagrant will not configure this network interface)
+# - intnet (if true, an internal network adapter will be created instead of a host-only adapter)
+def network_options(host)
+  options = {}
+
+  if host.key?('ip')
+    options[:ip] = host['ip']
+    options[:netmask] = host['netmask'] ||= '255.255.255.0'
+  else
+    options[:type] = 'dhcp'
+  end
+
+  if host.key?('mac')
+    options[:mac] = host['mac'].gsub(/[-:]/, '')
+  end
+  
+  if host.key?('auto_config')
+    options[:auto_config] = host['auto_config']
+  end
+  
+  if host.key?('intnet') && host['intnet']
+    options[:virtualbox__intnet] = true
+  end
+
+  options
+end
+
+Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
+    config.vm.box = 'generic/debian10'
+    
+    # Disable default rsync of current host directory
+    # config.vm.synced_folder '.', '/vagrant', disabled: true
+    
+    # TODO: handle provisioning of ssh certs
+    # config.ssh.insert_key = false
+    # config.ssh.private_key_path
+    
+    hosts.each do |host|
+        config.vm.define host['name'] do |node|
+            if node.key?(:box)
+                node.vm.box = host['box']
+                # TODO: custom box_url
+            end
+
+            # TODO: custom suffix? + '.box'
+            node.vm.hostname = host['name']
+            node.vm.network :private_network, network_options host
+            
+            node.vm.provider :libvirt do |virt|
+                virt.memory = memory
+                virt.cpus = cpus
+            end
+
+            node.vm.provider :virtualbox do |vb|
+                vb.gui = node.fetch(:gui, false)
+                vb.name = host['name']
+                vb.customize [
+                    'modifyvm', :id,
+                    '--memory', memory.to_s,
+                    '--cpus', cpus.to_s,
+                    '--cpuexecutioncap', cpu_cap.to_s,
+                ]
+            end
+        end
+    end
+            
+    # TODO: this fine out here or do we only do this on the last/final machine or from an orchestrator box to simulate a CI setup kicking things off (see below)?
+    node.vm.provision :ansible do |ansible|
+        # TODO: try this out once pre-configured ssh certs are in place
+        # ansible.host_key_checking = true
+        ansible.playbook = 'playbook.yml'
+        # ansible.host_vars = {}
+        # ansible.groups = {}
+    end
+    
+=begin
+    config.vm.define 'ci' do |ci|
+        ci.vm.network :private_network, ip: 'TODO'
+        
+        ci.vm.provision :ansible_local do |ansible|
+            ansible.playbook = 'playbook.yml'
+            ansible.verbose = true
+            ansible.install = true
+            ansible.limit = 'all'
+            ansible.inventory_path = 'inventory'
+        end
+    end
+=end
+end
